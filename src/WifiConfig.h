@@ -40,7 +40,6 @@ String getNavbar(String navbarTitle)
     </nav>
   )rawliteral";
     html.replace("NAVBAR_TITLE", navbarTitle);
-
     return html;
 }
 
@@ -63,10 +62,8 @@ void handleLayoutMainPage()
     <body>
   )rawliteral";
 
-    // Navbar penuh
-    html += getNavbar("WiFi Config"); // sisipkan navbar di sini
+    html += getNavbar("WiFi Config");
 
-    // Isi halaman utama
     html += R"rawliteral(
     <div class="container py-4">
       <div class="card shadow mx-auto" style="max-width: 500px;">
@@ -87,7 +84,7 @@ void handleLayoutMainPage()
         </div>
       </div>
     </div>
-    <script src="/bootstrap.min.js"></script>
+    <script src="/bootstrap.bundle.min.js"></script>
   </body>
   </html>
   )rawliteral";
@@ -99,6 +96,8 @@ void handleLayoutMainPage()
 
 void handleSave()
 {
+    Serial.println("==> handleSave terpanggil");
+
     ssid = server.arg("ssid");
     password = server.arg("password");
 
@@ -129,7 +128,7 @@ void handleSave()
   )rawliteral";
 
     server.send(200, "text/html", html);
-    ESP.restart();
+    // ESP.restart();
 }
 
 void setupWiFiAP()
@@ -138,8 +137,8 @@ void setupWiFiAP()
     ipAddr.fromString(ip);
     IPAddress NMask(255, 255, 255, 0);
     WiFi.softAPConfig(ipAddr, ipAddr, NMask);
-    WiFi.softAP(apName, "", 1, false); // false = AP is visible (not hidden)
-    Serial.println("AP Mode: ESP32_Config, IP: " + WiFi.softAPIP().toString());
+    WiFi.softAP(apName, "", 1, false);
+    Serial.println("AP Mode aktif. IP: " + WiFi.softAPIP().toString());
 }
 
 bool connectToWiFi()
@@ -168,19 +167,11 @@ bool connectToWiFi()
     if (WiFi.status() == WL_CONNECTED)
     {
         Serial.println("\nTersambung! IP: " + WiFi.localIP().toString());
-        // singleBuzzPattern();
-        // lcd.init();
-        // lcd.backlight();
-        // lcdShowIp(apName, WiFi.localIP().toString(), WiFi.macAddress());
-
         delay(1500);
         isConnected = true;
         return true;
     }
 
-    // multipleBuzzPattern();
-    // lcdShowFailedConnect(apName);
-    delay(1000);
     Serial.println("\nKoneksi gagal.");
     delay(1500);
     isConnected = false;
@@ -191,23 +182,35 @@ void setupWiFiManager()
 {
     setupWiFiAP();
     connectToWiFi();
+
     server.on("/", HTTP_GET, handleLayoutMainPage);
     server.on("/save", HTTP_POST, handleSave);
 
+    // Debug file statis
     if (!SPIFFS.begin(true))
     {
         Serial.println("Gagal mounting SPIFFS");
         return;
     }
-    server.serveStatic("/", SPIFFS, "/"); // Melayani file SPIFFS
+
+    // Serve only specific static files (tidak menimpa root "/")
+    server.serveStatic("/bootstrap.min.css", SPIFFS, "/bootstrap.min.css");
+    server.serveStatic("/bootstrap.bundle.min.js", SPIFFS, "/bootstrap.bundle.min.js");
+    server.serveStatic("/sweetalert.all.min.js", SPIFFS, "/sweetalert.all.min.js");
+
+    // Optional fallback
+    server.onNotFound([]() {
+        Serial.println("Route tidak ditemukan: " + server.uri());
+        server.send(404, "text/plain", "Not Found");
+    });
+
     server.begin();
     Serial.println("Web server aktif di " + ip);
 }
 
 void handleWiFiManagerLoop()
 {
-  server.handleClient();
+    server.handleClient();
 }
-
 
 #endif
